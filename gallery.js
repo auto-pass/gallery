@@ -2,29 +2,25 @@
   const BACKEND_BASE = 'https://autopass-backend.onrender.com';
   const API_CARS = `${BACKEND_BASE}/cars`;
   const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/auto-pass/gallery/main';
+
   const galleryEl = document.getElementById('gallery');
 
-  function getQuery(name) {
-    return new URLSearchParams(location.search).get(name);
-  }
-
   function getPlateFromUrl() {
-    const qp = getQuery('plate');
+    const qp = new URLSearchParams(location.search).get('plate');
     if (qp) return qp.trim();
+
     const path = location.pathname.replace(/\/+$/, '');
     const parts = path.split('/');
     const last = parts[parts.length - 1];
+
     if (last.toLowerCase().endsWith('.html')) {
       return parts.length > 1 ? parts[parts.length - 2] : null;
     }
+
     return last;
   }
 
   function showMessage(text) {
-    if (!galleryEl) {
-      document.body.innerHTML = `<div style="padding:20px">${text}</div>`;
-      return;
-    }
     galleryEl.innerHTML = `<div class="msg">${text}</div>`;
   }
 
@@ -45,34 +41,38 @@
       img.src = url;
       img.alt = `${plate} ${i}`;
       img.loading = 'lazy';
-      img.style.maxWidth = '100%';
-      img.style.height = 'auto';
-      img.style.display = 'block';
-      img.style.borderRadius = '6px';
       img.onerror = () => (wrap.style.display = 'none');
-      // simple fullscreen on tap (optional)
-      img.onclick = () => {
-        if (document.fullscreenElement) {
-          document.exitFullscreen().catch(()=>{});
-        } else {
-          img.requestFullscreen().catch(()=>{});
-        }
-      };
       wrap.appendChild(img);
       nodes.push(wrap);
     }
     return nodes;
   }
 
-  function fmtNumber(n){
-    if (n === undefined || n === null || n === '') return null;
-    const num = Number(String(n).replace(/[^0-9.-]/g,''));
-    if (Number.isNaN(num)) return null;
-    return num.toLocaleString();
+  function buildCarHeader(car) {
+    const header = document.createElement('div');
+    header.style.textAlign = 'center';
+    header.style.margin = '10px 0 20px 0';
+    header.innerHTML = `
+      <div style="font-size:20px;font-weight:bold;margin-bottom:6px;">
+        ${car.Brand} ${car.Model} ${car.Spec} ${car.Year}
+      </div>
+      <div style="font-size:18px;margin-bottom:4px;">
+        RM ${Number(car.OTR).toLocaleString()}
+      </div>
+      <div style="font-size:16px;margin-bottom:12px;">
+        BULANAN ${car.Monthly} UNTUK ${car.Tenure} TAHUN
+      </div>
+      <button id="backBtn"
+        style="background:#444;color:#fff;padding:8px 14px;border:none;border-radius:6px;cursor:pointer;">
+        ← Kembali
+      </button>
+    `;
+    return header;
   }
 
   async function run() {
     const plate = (getPlateFromUrl() || '').toUpperCase();
+
     if (!plate) {
       showMessage('❌ Provide plate in URL: ?plate=SK3827B or /gallery/SK3827B');
       return;
@@ -98,48 +98,17 @@
       return;
     }
 
-    // Only PHOTO gallery — no details/header (Version 1 "old" behavior)
-    galleryEl.innerHTML = ''; // clear
+    const header = buildCarHeader(car);
     const nodes = buildImageElements(plate, picCount);
-    nodes.forEach(n => {
-      const wrapper = document.createElement('div');
-      wrapper.style.width = '100%';
-      wrapper.style.display = 'flex';
-      wrapper.style.justifyContent = 'center';
-      wrapper.style.marginBottom = '14px';
-      wrapper.appendChild(n);
-      galleryEl.appendChild(wrapper);
-    });
 
+    galleryEl.innerHTML = '';
+    galleryEl.appendChild(header);
+    nodes.forEach(n => galleryEl.appendChild(n));
     document.title = `${plate} — Gallery`;
 
-    // Floating Back button (bottom-left)
-    const returnParam = getQuery('return'); // e.g. 1700
-    const backBtn = document.createElement('a');
-    backBtn.href = returnParam ? `./index-${encodeURIComponent(returnParam)}.html` : 'javascript:history.back()';
-    backBtn.textContent = '⬅ Kembali';
-    Object.assign(backBtn.style, {
-      position: 'fixed',
-      left: '14px',
-      bottom: '18px',
-      zIndex: 9999,
-      background: '#111',
-      color: '#fff',
-      padding: '10px 14px',
-      borderRadius: '999px',
-      textDecoration: 'none',
-      boxShadow: '0 6px 18px rgba(0,0,0,0.3)',
-      fontWeight: 700,
-      fontSize: '14px',
-      opacity: 0.95
-    });
-    document.body.appendChild(backBtn);
+    const backBtn = document.getElementById('backBtn');
+    backBtn.addEventListener('click', () => history.back());
   }
 
-  // run only after DOM loaded
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', run);
-  } else {
-    run();
-  }
+  run();
 })();
