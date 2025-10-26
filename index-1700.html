@@ -9,12 +9,13 @@
       --page-max-width:1100px;
       --card-bg:#fff;
       --card-border:#e6e6e6;
-      --gold:#d7a52a; /* header gold */
+      --gold:#d7a52a;
       --text:#111;
+      --thumb-height:220px;
+      --thumb-radius:10px;
     }
     html,body{height:100%;margin:0;background:#fafafa;color:var(--text);font-family:Arial,Helvetica,sans-serif}
     .wrap{max-width:var(--page-max-width);margin:0 auto;padding:14px}
-    /* Big header bar (C) */
     .hero{
       display:flex;align-items:center;justify-content:center;
       background:linear-gradient(90deg,var(--gold), #f3c95b);
@@ -23,26 +24,28 @@
       text-align:center;
     }
     .hero h1{margin:0;font-size:18px}
-    /* brand group */
     .brand-group{margin-bottom:22px}
     .brand-title{font-weight:800;letter-spacing:0.6px;margin:4px 0 8px}
     .divider{height:1px;background:linear-gradient(90deg,#eee,#fff);margin-bottom:10px;border-radius:2px}
-    /* cards grid */
-    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+    .grid{display:flex;flex-direction:column;gap:14px}
     .card{
       background:var(--card-bg);
       border:1px solid var(--card-border);
-      border-radius:8px;padding:12px;box-sizing:border-box;
+      border-radius:10px;padding:12px;box-sizing:border-box;display:flex;flex-direction:column;gap:10px;
     }
-    .car-title{font-weight:700;margin-bottom:6px;font-size:15px}
-    .car-otr{font-weight:700;margin-bottom:6px}
-    .car-month{color:#444;margin-bottom:6px}
+    .thumb-wrap{width:100%;overflow:hidden;border-radius:var(--thumb-radius);}
+    .thumb-wrap img{width:100%;height:var(--thumb-height);object-fit:cover;display:block;border-radius:var(--thumb-radius);}
+    .car-title{font-weight:700;margin:0;font-size:15px}
+    .car-otr{font-weight:700;margin:0}
+    .car-month{color:#444;margin:0}
+    .card-footer{display:flex;justify-content:flex-start;gap:10px;align-items:center}
     .btn{
       display:inline-block;padding:8px 10px;border-radius:8px;background:#0077ff;color:#fff;text-decoration:none;font-weight:700;font-size:13px;
     }
     .msg{padding:12px;background:#fff;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.04);text-align:center}
     @media (max-width:420px){
-      .grid{grid-template-columns:1fr}
+      :root{--page-max-width:100%}
+      .wrap{padding:12px}
     }
   </style>
 </head>
@@ -60,22 +63,26 @@
 
   <script>
   (async () => {
-    // ---- CONFIG for this file ----
-    const NETTPAY_AMOUNT = 1700;   // change when copying file
-    const MAX_OTR = 35000;         // change when copying file
+    // --- CONFIG: change these when copying file for other nettpay pages ---
+    const NETTPAY_AMOUNT = 1700;   // update for each file
+    const MAX_OTR = 35000;         // update for each file
     const API_CARS = 'https://autopass-backend.onrender.com/cars';
-    // --------------------------------
+    // ----------------------------------------------------------------------
 
     const loadingEl = document.getElementById('loading');
     const carsContainer = document.getElementById('carsContainer');
     const pageTitle = document.getElementById('pageTitle');
     pageTitle.textContent = `Kereta Sesuai Gaji Bersih RM${NETTPAY_AMOUNT}`;
 
-    function fmtNumber(n){
+    function safeNum(n){
       if (n === undefined || n === null || n === '') return null;
       const num = Number(String(n).replace(/[^0-9.-]/g,''));
       if (Number.isNaN(num)) return null;
-      return num.toLocaleString();
+      return num;
+    }
+    function fmt(n){
+      const v = safeNum(n);
+      return v === null ? null : v.toLocaleString();
     }
 
     try {
@@ -85,8 +92,8 @@
 
       // Filter by OTR <= MAX_OTR
       const filtered = (cars || []).filter(c => {
-        const otrNum = Number(c.OTR);
-        return !Number.isNaN(otrNum) && otrNum <= MAX_OTR;
+        const otrNum = safeNum(c.OTR);
+        return otrNum !== null && otrNum <= MAX_OTR;
       });
 
       if (!filtered.length) {
@@ -94,7 +101,7 @@
         return;
       }
 
-      // Sort as in app: Brand -> Model -> Spec -> Year desc
+      // Sort: Brand -> Model -> Spec -> Year desc
       filtered.sort((a,b) => {
         const brandCompare = (a.Brand ?? '').localeCompare(b.Brand ?? '');
         if (brandCompare !== 0) return brandCompare;
@@ -105,7 +112,7 @@
         return (b.Year ?? 0) - (a.Year ?? 0);
       });
 
-      // Group by brand
+      // Group by brand (uppercase)
       const groups = filtered.reduce((acc, car) => {
         const brand = (car.Brand || 'Unknown').toUpperCase();
         if (!acc[brand]) acc[brand] = [];
@@ -113,7 +120,7 @@
         return acc;
       }, {});
 
-      // Render groups
+      // Render groups (full-width cards)
       carsContainer.innerHTML = '';
       for (const brand of Object.keys(groups)) {
         const groupEl = document.createElement('section');
@@ -124,7 +131,9 @@
         title.textContent = brand;
         groupEl.appendChild(title);
 
-        groupEl.appendChild(Object.assign(document.createElement('div'), { className:'divider' }));
+        const divider = document.createElement('div');
+        divider.className = 'divider';
+        groupEl.appendChild(divider);
 
         const grid = document.createElement('div');
         grid.className = 'grid';
@@ -133,13 +142,27 @@
           const card = document.createElement('article');
           card.className = 'card';
 
+          // Thumbnail (1.jpg)
+          const thumbWrap = document.createElement('div');
+          thumbWrap.className = 'thumb-wrap';
+          const img = document.createElement('img');
+          img.loading = 'lazy';
+          // image path (1.jpg) — assumes folder /gallery/<plate>/1.jpg as discussed
+          const plateEncoded = encodeURIComponent(car.PlateNumber || '');
+          img.src = `https://raw.githubusercontent.com/auto-pass/gallery/main/${plateEncoded}/1.jpg`;
+          img.alt = `${car.PlateNumber || ''} cover`;
+          img.onerror = () => { img.style.display = 'none'; };
+          thumbWrap.appendChild(img);
+          card.appendChild(thumbWrap);
+
+          // Title line
           const titleEl = document.createElement('div');
           titleEl.className = 'car-title';
-          // Title: BRAND MODEL SPEC YEAR (user requested uppercase previously)
           titleEl.textContent = `${(car.Brand||'').toUpperCase()} ${(car.Model||'').toUpperCase()} ${(car.Spec||'').toUpperCase()} ${car.Year||''}`.trim();
           card.appendChild(titleEl);
 
-          const otrFormatted = fmtNumber(car.OTR);
+          // OTR line (hide if missing)
+          const otrFormatted = fmt(car.OTR);
           if (otrFormatted !== null) {
             const otrEl = document.createElement('div');
             otrEl.className = 'car-otr';
@@ -147,7 +170,7 @@
             card.appendChild(otrEl);
           }
 
-          // Monthly and tenure: 3-line layout
+          // Monthly & Tenure (3-line)
           const monthly = (car.Monthly || '').toString().trim();
           const tenure = (car.Tenure || '').toString().trim();
           if (monthly || tenure) {
@@ -160,13 +183,15 @@
             card.appendChild(monthEl);
           }
 
-          // View photos button — link to photo-only gallery (version 1)
-          const btn = document.createElement('a');
-          btn.className = 'btn';
-          const plate = encodeURIComponent(car.PlateNumber || '');
-          btn.href = `https://auto-pass.github.io/gallery/?plate=${plate}&return=${NETTPAY_AMOUNT}`;
-          btn.textContent = 'LIHAT GAMBAR';
-          card.appendChild(btn);
+          // View photos link (opens version 1 gallery) — include return param
+          const footer = document.createElement('div');
+          footer.className = 'card-footer';
+          const a = document.createElement('a');
+          a.className = 'btn';
+          a.href = `https://auto-pass.github.io/gallery/?plate=${plateEncoded}&return=${NETTPAY_AMOUNT}`;
+          a.textContent = 'LIHAT GAMBAR';
+          footer.appendChild(a);
+          card.appendChild(footer);
 
           grid.appendChild(card);
         }
