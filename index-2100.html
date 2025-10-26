@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kereta Sesuai Gaji Bersih RM2100</title>
+  <style>
+    :root{
+      --page-max-width:1100px;
+      --card-bg:#fff;
+      --card-border:#e6e6e6;
+      --gold:#d7a52a; /* header gold */
+      --text:#111;
+    }
+    html,body{height:100%;margin:0;background:#fafafa;color:var(--text);font-family:Arial,Helvetica,sans-serif}
+    .wrap{max-width:var(--page-max-width);margin:0 auto;padding:14px}
+    /* Big header bar (C) */
+    .hero{
+      display:flex;align-items:center;justify-content:center;
+      background:linear-gradient(90deg,var(--gold), #f3c95b);
+      color:#111;font-weight:800;padding:18px 12px;border-radius:10px;margin-bottom:18px;
+      box-shadow:0 6px 18px rgba(0,0,0,0.06);
+      text-align:center;
+    }
+    .hero h1{margin:0;font-size:18px}
+    /* brand group */
+    .brand-group{margin-bottom:22px}
+    .brand-title{font-weight:800;letter-spacing:0.6px;margin:4px 0 8px}
+    .divider{height:1px;background:linear-gradient(90deg,#eee,#fff);margin-bottom:10px;border-radius:2px}
+    /* cards grid */
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+    .card{
+      background:var(--card-bg);
+      border:1px solid var(--card-border);
+      border-radius:8px;padding:12px;box-sizing:border-box;
+    }
+    .car-title{font-weight:700;margin-bottom:6px;font-size:15px}
+    .car-otr{font-weight:700;margin-bottom:6px}
+    .car-month{color:#444;margin-bottom:6px}
+    .btn{
+      display:inline-block;padding:8px 10px;border-radius:8px;background:#0077ff;color:#fff;text-decoration:none;font-weight:700;font-size:13px;
+    }
+    .msg{padding:12px;background:#fff;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.04);text-align:center}
+    @media (max-width:420px){
+      .grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <h1 id="pageTitle">Kereta Sesuai Gaji Bersih RM2100</h1>
+    </div>
+
+    <div id="content">
+      <div id="loading" class="msg">⏳ Memuatkan senarai kereta…</div>
+      <div id="carsContainer"></div>
+    </div>
+  </div>
+
+  <script>
+  (async () => {
+    // ---- CONFIG for this file ----
+    const NETTPAY_AMOUNT = 2100;   // change when copying file
+    const MAX_OTR = 55000;         // change when copying file
+    const API_CARS = 'https://autopass-backend.onrender.com/cars';
+    // --------------------------------
+
+    const loadingEl = document.getElementById('loading');
+    const carsContainer = document.getElementById('carsContainer');
+    const pageTitle = document.getElementById('pageTitle');
+    pageTitle.textContent = `Kereta Sesuai Gaji Bersih RM${NETTPAY_AMOUNT}`;
+
+    function fmtNumber(n){
+      if (n === undefined || n === null || n === '') return null;
+      const num = Number(String(n).replace(/[^0-9.-]/g,''));
+      if (Number.isNaN(num)) return null;
+      return num.toLocaleString();
+    }
+
+    try {
+      const res = await fetch(API_CARS, { cache:'no-cache' });
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      const cars = await res.json();
+
+      // Filter by OTR <= MAX_OTR
+      const filtered = (cars || []).filter(c => {
+        const otrNum = Number(c.OTR);
+        return !Number.isNaN(otrNum) && otrNum <= MAX_OTR;
+      });
+
+      if (!filtered.length) {
+        loadingEl.textContent = 'Tiada kereta untuk julat ini.';
+        return;
+      }
+
+      // Sort as in app: Brand -> Model -> Spec -> Year desc
+      filtered.sort((a,b) => {
+        const brandCompare = (a.Brand ?? '').localeCompare(b.Brand ?? '');
+        if (brandCompare !== 0) return brandCompare;
+        const modelCompare = (a.Model ?? '').localeCompare(b.Model ?? '');
+        if (modelCompare !== 0) return modelCompare;
+        const specCompare = (a.Spec ?? '').localeCompare(b.Spec ?? '');
+        if (specCompare !== 0) return specCompare;
+        return (b.Year ?? 0) - (a.Year ?? 0);
+      });
+
+      // Group by brand
+      const groups = filtered.reduce((acc, car) => {
+        const brand = (car.Brand || 'Unknown').toUpperCase();
+        if (!acc[brand]) acc[brand] = [];
+        acc[brand].push(car);
+        return acc;
+      }, {});
+
+      // Render groups
+      carsContainer.innerHTML = '';
+      for (const brand of Object.keys(groups)) {
+        const groupEl = document.createElement('section');
+        groupEl.className = 'brand-group';
+
+        const title = document.createElement('div');
+        title.className = 'brand-title';
+        title.textContent = brand;
+        groupEl.appendChild(title);
+
+        groupEl.appendChild(Object.assign(document.createElement('div'), { className:'divider' }));
+
+        const grid = document.createElement('div');
+        grid.className = 'grid';
+
+        for (const car of groups[brand]) {
+          const card = document.createElement('article');
+          card.className = 'card';
+
+          const titleEl = document.createElement('div');
+          titleEl.className = 'car-title';
+          // Title: BRAND MODEL SPEC YEAR (user requested uppercase previously)
+          titleEl.textContent = `${(car.Brand||'').toUpperCase()} ${(car.Model||'').toUpperCase()} ${(car.Spec||'').toUpperCase()} ${car.Year||''}`.trim();
+          card.appendChild(titleEl);
+
+          const otrFormatted = fmtNumber(car.OTR);
+          if (otrFormatted !== null) {
+            const otrEl = document.createElement('div');
+            otrEl.className = 'car-otr';
+            otrEl.textContent = `RM${otrFormatted}`;
+            card.appendChild(otrEl);
+          }
+
+          // Monthly and tenure: 3-line layout
+          const monthly = (car.Monthly || '').toString().trim();
+          const tenure = (car.Tenure || '').toString().trim();
+          if (monthly || tenure) {
+            const monthEl = document.createElement('div');
+            monthEl.className = 'car-month';
+            let txt = '';
+            if (monthly) txt += `Bulanan ${monthly}`;
+            if (tenure) txt += (txt ? ' utk ' : '') + `${tenure} tahun`;
+            monthEl.textContent = txt;
+            card.appendChild(monthEl);
+          }
+
+          // View photos button — link to photo-only gallery (version 1)
+          const btn = document.createElement('a');
+          btn.className = 'btn';
+          const plate = encodeURIComponent(car.PlateNumber || '');
+          btn.href = `https://auto-pass.github.io/gallery/?plate=${plate}&return=${NETTPAY_AMOUNT}`;
+          btn.textContent = 'LIHAT GAMBAR';
+          card.appendChild(btn);
+
+          grid.appendChild(card);
+        }
+
+        groupEl.appendChild(grid);
+        carsContainer.appendChild(groupEl);
+      }
+
+      loadingEl.style.display = 'none';
+    } catch (err) {
+      loadingEl.textContent = `❌ ${err.message}`;
+    }
+  })();
+  </script>
+</body>
+</html>
