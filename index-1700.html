@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cars — Nettpay &lt; RM 1700</title>
+  <style>
+    html,body{height:100%;margin:0;background:#fafafa;color:#111;font-family:Arial,Helvetica,sans-serif;}
+    .container{max-width:1100px;margin:0 auto;padding:16px;}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+    header h1{font-size:20px;margin:0;}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+    .card{
+      background:#fff;border-radius:10px;padding:14px;box-shadow:0 6px 18px rgba(0,0,0,0.06);
+      display:flex;flex-direction:column;gap:8px;position:relative;
+    }
+    .status-badge{
+      position:absolute;top:10px;right:10px;background:#ff6b6b;color:#fff;padding:6px 8px;border-radius:6px;font-weight:700;font-size:12px;
+    }
+    .brand{font-weight:800;font-size:16px}
+    .otr{font-weight:700}
+    .monthly{font-weight:600;color:#333}
+    .meta{color:#666;font-size:13px}
+    .btn-row{display:flex;gap:8px;margin-top:8px}
+    .btn{
+      background:#0077ff;color:#fff;padding:8px 10px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;
+    }
+    .btn.secondary{background:#eee;color:#111;font-weight:700}
+    .top-links{display:flex;gap:8px;flex-wrap:wrap}
+    .msg{padding:12px;background:#fff;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.04);text-align:center}
+    @media (max-width:420px){
+      .grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1 id="title">Nettpay &lt; RM 1700</h1>
+      <div class="top-links" id="nettpayLinks"></div>
+    </header>
+
+    <div id="content">
+      <div id="loading" class="msg">⏳ Loading cars…</div>
+      <div id="list" class="grid" style="display:none"></div>
+    </div>
+  </div>
+
+  <script>
+  (async () => {
+    // ----- CONFIGURE for this index page -----
+    const NETTPAY_AMOUNT = 1700;
+    const MAX_OTR = 35000; // <= this
+    const API_CARS = 'https://autopass-backend.onrender.com/cars';
+    // ------------------------------------------
+
+    const titleEl = document.getElementById('title');
+    const listEl = document.getElementById('list');
+    const loadingEl = document.getElementById('loading');
+    const linksEl = document.getElementById('nettpayLinks');
+
+    // build top links to other nettpay pages (quick nav)
+    const nettpayRanges = [
+      { amount:1700, maxOTR:35000 },
+      { amount:1800, maxOTR:40000 },
+      { amount:1900, maxOTR:45000 },
+      { amount:2000, maxOTR:50000 },
+      { amount:2100, maxOTR:55000 },
+      { amount:2200, maxOTR:60000 },
+      { amount:2300, maxOTR:65000 },
+      { amount:2400, maxOTR:70000 },
+      { amount:2500, maxOTR:100000 }
+    ];
+
+    nettpayRanges.forEach(r => {
+      const a = document.createElement('a');
+      a.href = `./index-${r.amount}.html`;
+      a.className = 'btn secondary';
+      a.textContent = r.amount === 2500 ? '> RM 2500' : `< RM ${r.amount}`;
+      linksEl.appendChild(a);
+    });
+
+    titleEl.textContent = NETTPAY_AMOUNT === 2500 ? 'Nettpay > RM 2500' : `Nettpay < RM ${NETTPAY_AMOUNT}`;
+
+    function fmtNumber(n){
+      if (n === undefined || n === null || n === '') return null;
+      const num = Number(String(n).replace(/[^0-9.-]/g,''));
+      if (Number.isNaN(num)) return null;
+      return num.toLocaleString();
+    }
+
+    try {
+      const res = await fetch(API_CARS, { cache: 'no-cache' });
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      const carsRaw = await res.json();
+      // filter by OTR <= MAX_OTR
+      const filtered = carsRaw.filter(c => {
+        const otrNum = Number(c.OTR);
+        return !Number.isNaN(otrNum) && otrNum <= MAX_OTR;
+      });
+
+      if (filtered.length === 0) {
+        loadingEl.textContent = 'No cars found for this nettpay range.';
+        return;
+      }
+
+      // sort: Brand -> Model -> Spec -> Year desc
+      filtered.sort((a,b) => {
+        const brandCompare = (a.Brand ?? '').localeCompare(b.Brand ?? '');
+        if (brandCompare !== 0) return brandCompare;
+        const modelCompare = (a.Model ?? '').localeCompare(b.Model ?? '');
+        if (modelCompare !== 0) return modelCompare;
+        const specCompare = (a.Spec ?? '').localeCompare(b.Spec ?? '');
+        if (specCompare !== 0) return specCompare;
+        return (b.Year ?? 0) - (a.Year ?? 0);
+      });
+
+      // render cards
+      listEl.innerHTML = '';
+      for (const car of filtered) {
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        // status badge (C - recommended)
+        if ((car.Status || '').toUpperCase() === 'NEW STOCK') {
+          const badge = document.createElement('div');
+          badge.className = 'status-badge';
+          badge.textContent = '🔥 NEW STOCK';
+          card.appendChild(badge);
+        }
+
+        const title = document.createElement('div');
+        title.className = 'brand';
+        title.textContent = `${(car.Brand||'').toUpperCase()} ${(car.Model||'').toUpperCase()} ${(car.Spec||'').toUpperCase()} ${(car.Year||'')}`.trim();
+        card.appendChild(title);
+
+        // OTR line — hide if missing
+        const formattedOtr = fmtNumber(car.OTR);
+        if (formattedOtr !== null) {
+          const otr = document.createElement('div');
+          otr.className = 'otr';
+          otr.textContent = `RM ${formattedOtr}`;
+          card.appendChild(otr);
+        }
+
+        // Monthly & Tenure line
+        const monthly = (car.Monthly || '').toString().trim();
+        const tenure = (car.Tenure || '').toString().trim();
+        const monthlyLine = document.createElement('div');
+        monthlyLine.className = 'monthly';
+        // follow your exact wording: BULANAN 780 UTK 9 TAHUN
+        let monthlyText = '';
+        if (monthly) monthlyText += `BULANAN ${monthly}`;
+        if (tenure) monthlyText += (monthlyText ? ' UTK ' : '') + `${tenure} TAHUN`;
+        if (monthlyText) {
+          monthlyLine.textContent = monthlyText;
+          card.appendChild(monthlyLine);
+        }
+
+        // description or meta (optional)
+        if (car.Description) {
+          const desc = document.createElement('div');
+          desc.className = 'meta';
+          desc.textContent = String(car.Description).slice(0, 120);
+          card.appendChild(desc);
+        }
+
+        const btnRow = document.createElement('div');
+        btnRow.className = 'btn-row';
+
+        // View photos — links to your GitHub pages gallery, include return param so gallery page can route back
+        const view = document.createElement('a');
+        view.className = 'btn';
+        const plate = encodeURIComponent(car.PlateNumber || '');
+        view.href = `https://auto-pass.github.io/gallery/?plate=${plate}&return=${NETTPAY_AMOUNT}`;
+        view.textContent = 'LIHAT GAMBAR';
+        btnRow.appendChild(view);
+
+        // Optional: direct gallery.html?plate=... alternative
+        card.appendChild(btnRow);
+        listEl.appendChild(card);
+      }
+
+      loadingEl.style.display = 'none';
+      listEl.style.display = 'grid';
+    } catch (err) {
+      loadingEl.textContent = `❌ ${err.message}`;
+    }
+  })();
+  </script>
+</body>
+</html>
