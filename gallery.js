@@ -21,6 +21,10 @@
   }
 
   function showMessage(text) {
+    if (!galleryEl) {
+      document.body.innerHTML = `<div style="padding:20px">${text}</div>`;
+      return;
+    }
     galleryEl.innerHTML = `<div class="msg">${text}</div>`;
   }
 
@@ -41,8 +45,12 @@
       img.src = url;
       img.alt = `${plate} ${i}`;
       img.loading = 'lazy';
+      img.style.maxWidth = '100%';
+      img.style.height = 'auto';
+      img.style.display = 'block';
+      img.style.borderRadius = '6px';
       img.onerror = () => (wrap.style.display = 'none');
-      // fullscreen on tap
+      // simple fullscreen on tap (optional)
       img.onclick = () => {
         if (document.fullscreenElement) {
           document.exitFullscreen().catch(()=>{});
@@ -90,46 +98,30 @@
       return;
     }
 
-    // Render header info above photos
-    const header = document.createElement('div');
-    header.style.width = '100%';
-    header.style.maxWidth = '1400px';
-    header.style.margin = '0 auto 16px';
-    header.style.padding = '12px';
-    header.style.background = 'rgba(255,255,255,0.04)';
-    header.style.borderRadius = '8px';
-    header.style.boxSizing = 'border-box';
-    header.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
-        <div style="min-width:0">
-          <div style="font-weight:800;font-size:18px;margin-bottom:6px">
-            ${(car.Brand||'').toUpperCase()} ${(car.Model||'').toUpperCase()} ${(car.Spec||'').toUpperCase()} ${(car.Year||'')}
-          </div>
-          ${fmtNumber(car.OTR) ? `<div style="font-weight:700;margin-bottom:6px">RM ${fmtNumber(car.OTR)}</div>` : ''}
-          <div style="font-weight:600;color:#ddd">BULANAN ${car.Monthly || '-'} UTK ${car.Tenure || '-'} TAHUN</div>
-        </div>
-        <div style="text-align:right;">
-          ${car.Status ? `<div style="color:#ff6b6b;font-weight:800">${car.Status}</div>` : ''}
-          ${car.Description ? `<div style="color:#bbb;margin-top:8px;max-width:380px">${String(car.Description).slice(0,220)}</div>` : ''}
-        </div>
-      </div>
-    `;
-    galleryEl.innerHTML = '';
-    galleryEl.appendChild(header);
-
+    // Only PHOTO gallery — no details/header (Version 1 "old" behavior)
+    galleryEl.innerHTML = ''; // clear
     const nodes = buildImageElements(plate, picCount);
-    nodes.forEach(n => galleryEl.appendChild(n));
+    nodes.forEach(n => {
+      const wrapper = document.createElement('div');
+      wrapper.style.width = '100%';
+      wrapper.style.display = 'flex';
+      wrapper.style.justifyContent = 'center';
+      wrapper.style.marginBottom = '14px';
+      wrapper.appendChild(n);
+      galleryEl.appendChild(wrapper);
+    });
+
     document.title = `${plate} — Gallery`;
 
-    // Floating back button bottom-left (option C)
+    // Floating Back button (bottom-left)
     const returnParam = getQuery('return'); // e.g. 1700
     const backBtn = document.createElement('a');
     backBtn.href = returnParam ? `./index-${encodeURIComponent(returnParam)}.html` : 'javascript:history.back()';
     backBtn.textContent = '⬅ Kembali';
     Object.assign(backBtn.style, {
       position: 'fixed',
-      left: '16px',
-      bottom: '20px',
+      left: '14px',
+      bottom: '18px',
       zIndex: 9999,
       background: '#111',
       color: '#fff',
@@ -144,5 +136,10 @@
     document.body.appendChild(backBtn);
   }
 
-  run();
+  // run only after DOM loaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', run);
+  } else {
+    run();
+  }
 })();
