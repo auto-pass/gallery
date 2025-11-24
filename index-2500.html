@@ -67,10 +67,21 @@
       const res = await fetch(API_CARS,{cache:'no-cache'});
       if(!res.ok)throw new Error(`API ${res.status}`);
       const cars = await res.json();
-
-      const filtered = (cars||[]).filter(c=>{const o=safeNum(c.OTR);return o!==null&&o<=MAX_OTR;});
-      if(!filtered.length){loadingEl.textContent='Tiada kereta untuk julat ini.';return;}
-
+    
+      const filtered = (cars || []).filter(c => {
+        // ⭐ Only show NEW STOCK
+        if ((c.Status || "").toUpperCase() !== "NEW STOCK") return false;
+    
+        // ⭐ Your original OTR filter
+        const o = safeNum(c.OTR);
+        return o !== null && o <= MAX_OTR;
+      });
+    
+      if(!filtered.length){
+        loadingEl.textContent='Tiada kereta untuk julat ini.';
+        return;
+      }
+    
       filtered.sort((a,b)=>{
         const bc=(a.Brand||'').localeCompare(b.Brand||'');if(bc!==0)return bc;
         const mc=(a.Model||'').localeCompare(b.Model||'');if(mc!==0)return mc;
